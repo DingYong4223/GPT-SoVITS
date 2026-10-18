@@ -7,8 +7,27 @@ import sys
 from tempfile import TemporaryDirectory
 import unittest
 
+from tools.generate_voice import resolve_output
+
 
 class GenerateVoiceTest(unittest.TestCase):
+    def test_directory_output_uses_first_four_characters(self):
+        with TemporaryDirectory() as tmp:
+            directory = Path(tmp).resolve()
+            for text, name in [
+                ("不要", "buyao.mp3"),
+                ("开始下注", "kaishixiazhu.mp3"),
+                ("开始下注请稍候", "kaishixiazhu.mp3"),
+                ("  不要！ ", "buyao.mp3"),
+                ("不要/下注", "buyaoxiazhu.mp3"),
+            ]:
+                with self.subTest(text=text):
+                    self.assertEqual(resolve_output(text, directory), directory / name)
+            self.assertEqual(resolve_output("不要", directory / "new"), directory / "new/buyao.mp3")
+            self.assertEqual(resolve_output("不要", directory / "custom.wav"), directory / "custom.wav")
+            with self.assertRaises(ValueError):
+                resolve_output("！！！", directory)
+
     def test_rejects_invalid_input_before_loading_models(self):
         script = Path(__file__).with_name("generate_voice.py")
         with TemporaryDirectory() as tmp:

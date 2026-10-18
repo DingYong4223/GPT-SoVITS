@@ -3,6 +3,7 @@
 import argparse
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -13,25 +14,41 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 AUDIO_DIR = PROJECT_DIR.parent / "ChessGame/res/audio"
 
 
+def resolve_output(text, path):
+    output = path.expanduser().resolve()
+    if output.is_dir() or not output.suffix:
+        from pypinyin import lazy_pinyin
+
+        prefix = "".join(char for char in text if char.isalnum())[:4]
+        name = re.sub(r"[^a-z0-9]", "", "".join(lazy_pinyin(prefix)).lower())
+        if not name:
+            raise ValueError("文本无法生成拼音文件名，请通过 -o 指定完整文件名")
+        output = output / f"{name}.mp3"
+    return output
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("text", help="要合成的中文文本，如：开始下注")
     parser.add_argument(
-        "-o", "--output", type=Path, default=AUDIO_DIR / "gen/output.wav",
-        help="输出 WAV 或 MP3 文件路径（默认：ChessGame/res/audio/gen/output.wav；覆盖同名文件）",
+        "-o", "--output", type=Path, default=AUDIO_DIR / "gen",
+        help="输出目录或 WAV/MP3 文件；目录下按前四字拼音命名 MP3（默认：ChessGame/res/audio/gen/；覆盖同名文件）",
     )
     parser.add_argument(
-        "--ref-audio", type=Path, default=AUDIO_DIR / "VOICE_POINT_8_13.mp3",
+        "--ref-audio", type=Path, default=AUDIO_DIR / "VOICE_POINT_1_7.mp3",
         help="3～10 秒的中文参考录音路径",
     )
     parser.add_argument(
-        "--ref-text", default="8点,9点,10点,11点,12点,13点",
+        "--ref-text", default="一点,两点,三点,四点,五点,六点,七点",
         help="参考录音对应的文字，直接传文字，无需文本文件",
     )
     args = parser.parse_args()
     if not args.text.strip() or not args.ref_text.strip():
         parser.error("合成文本和参考文本不能为空")
-    output = args.output.expanduser().resolve()
+    try:
+        output = resolve_output(args.text, args.output)
+    except ValueError as error:
+        parser.error(str(error))
     ref_audio = args.ref_audio.expanduser().resolve()
     if not ref_audio.is_file():
         parser.error(f"参考录音不存在：{ref_audio}")
